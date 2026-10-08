@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="قائمة مهام بسيطة وأنيقة">
+  <title>Taskly | قائمة مهامي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">✓</div>
+        <div>
+          <h1>Taskly</h1>
+          <span>رتّب يومك ببساطة</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-filter="all">
+          <span>📋</span><span>كل المهام</span><b id="allCount">0</b>
+        </button>
+        <button class="nav-item" data-filter="active">
+          <span>⏳</span><span>قيد التنفيذ</span><b id="activeCount">0</b>
+        </button>
+        <button class="nav-item" data-filter="completed">
+          <span>✓</span><span>مكتملة</span><b id="completedCount">0</b>
+        </button>
+      </nav>
+
+      <div class="sidebar-tip">
+        <div class="tip-icon">💡</div>
+        <strong>نصيحة اليوم</strong>
+        <p>ابدأ بأهم مهمة عندك، وخلي الباقي خطوة بخطوة.</p>
+      </div>
+
+      <div class="sidebar-footer">بياناتك محفوظة على جهازك</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">لوحة مهامك</p>
+          <h2 id="greeting">أهلاً بك 👋</h2>
+          <p class="date" id="today"></p>
+        </div>
+        <button class="theme-btn" id="themeToggle" aria-label="تغيير المظهر">☾</button>
+      </header>
+
+      <section class="stats">
+        <div class="stat-card">
+          <div class="stat-icon purple">📋</div>
+          <div><span>إجمالي المهام</span><strong id="statAll">0</strong></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">⏳</div>
+          <div><span>قيد التنفيذ</span><strong id="statActive">0</strong></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green">✓</div>
+          <div><span>تم الإنجاز</span><strong id="statCompleted">0</strong></div>
+        </div>
+      </section>
+
+      <section class="task-section">
+        <div class="section-head">
+          <div>
+            <h3>قائمة المهام</h3>
+            <span id="sectionHint">كل مهامك في مكان واحد</span>
+          </div>
+          <button class="clear-btn" id="clearCompleted">مسح المكتملة</button>
+        </div>
+
+        <form class="add-form" id="taskForm">
+          <input id="taskInput" type="text" maxlength="120" autocomplete="off" placeholder="اكتب مهمة جديدة..." required>
+          <select id="priority">
+            <option value="normal">عادية</option>
+            <option value="high">مهمة</option>
+            <option value="low">منخفضة</option>
+          </select>
+          <button type="submit" class="add-btn"><span>+</span> إضافة</button>
+        </form>
+
+        <div class="filters-mobile">
+          <button class="filter active" data-filter="all">الكل</button>
+          <button class="filter" data-filter="active">قيد التنفيذ</button>
+          <button class="filter" data-filter="completed">مكتملة</button>
+        </div>
+
+        <div class="tasks" id="tasks"></div>
+
+        <div class="empty" id="emptyState" hidden>
+          <div>📝</div>
+          <h4>لا توجد مهام هنا</h4>
+          <p>أضف أول مهمة وابدأ يومك بشكل منظم.</p>
+        </div>
+      </section>
+
+      <section class="pomodoro">
+        <div class="pomo-info">
+          <p class="eyebrow">وضع التركيز</p>
+          <h3>Pomodoro Timer 🍅</h3>
+          <p>ركز 25 دقيقة، ثم خذ استراحة قصيرة وحافظ على إنتاجيتك.</p>
+          <div class="pomo-modes">
+            <button class="pomo-mode active" data-minutes="25">تركيز</button>
+            <button class="pomo-mode" data-minutes="5">استراحة</button>
+            <button class="pomo-mode" data-minutes="15">استراحة طويلة</button>
+          </div>
+        </div>
+        <div class="timer-box">
+          <div class="timer-circle"><span id="timer">25:00</span></div>
+          <div class="timer-actions">
+            <button id="timerStart" class="timer-primary">ابدأ</button>
+            <button id="timerReset" class="timer-secondary">إعادة</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="creator-credit">
+        صُمم وطُوّر بكل شغف بواسطة <strong>مصطفى المصري</strong> ✦
+        <span>— فكرتك، تصميمك، وبصمتك.</span>
+      </footer>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
