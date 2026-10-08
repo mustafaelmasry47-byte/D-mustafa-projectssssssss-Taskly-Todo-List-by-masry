@@ -157,11 +157,196 @@ document.getElementById("today").textContent =
 render();
 
 
-// Pomodoro Timer
-let pomoSeconds=25*60,pomoInterval=null,pomoRunning=false;
-const timerEl=document.getElementById("timer"),startBtn=document.getElementById("timerStart"),resetBtn=document.getElementById("timerReset"),modeButtons=document.querySelectorAll(".pomo-mode");
-function updateTimer(){const m=Math.floor(pomoSeconds/60).toString().padStart(2,"0"),s=(pomoSeconds%60).toString().padStart(2,"0");timerEl.textContent=`${m}:${s}`}
-function setPomodoro(minutes){clearInterval(pomoInterval);pomoRunning=false;pomoSeconds=minutes*60;startBtn.textContent="ابدأ";updateTimer()}
-startBtn.addEventListener("click",()=>{if(pomoRunning){clearInterval(pomoInterval);pomoRunning=false;startBtn.textContent="استمرار";return}pomoRunning=true;startBtn.textContent="إيقاف مؤقت";pomoInterval=setInterval(()=>{if(pomoSeconds<=0){clearInterval(pomoInterval);pomoRunning=false;startBtn.textContent="ابدأ";alert("أحسنت! انتهى الوقت 🎉");return}pomoSeconds--;updateTimer()},1000)});
-resetBtn.addEventListener("click",()=>setPomodoro(Number(document.querySelector(".pomo-mode.active").dataset.minutes)));
-modeButtons.forEach(btn=>btn.addEventListener("click",()=>{modeButtons.forEach(b=>b.classList.remove("active"));btn.classList.add("active");setPomodoro(Number(btn.dataset.minutes))}));
+// Pomodoro Timer — uses a real end timestamp so it keeps counting accurately
+// even when the tab is in the background. If the browser/page is fully closed,
+// browsers do not allow ordinary page JavaScript to keep running.
+const POMO_KEY = "taskly_pomodoro_v3";
+let pomoSeconds = 25 * 60, pomoInterval = null, pomoRunning = false, pomoEndAt = null;
+let pomoModeMinutes = 25;
+let audioContext = null;
+
+const timerEl = document.getElementById("timer");
+const startBtn = document.getElementById("timerStart");
+const resetBtn = document.getElementById("timerReset");
+const modeButtons = document.querySelectorAll(".pomo-mode");
+const celebration = document.getElementById("celebration");
+const alarmStatus = document.getElementById("alarmStatus");
+const timerCircle = document.querySelector(".timer-circle");
+
+function updateTimer(){
+  const safe = Math.max(0, Math.floor(pomoSeconds));
+  const m = Math.floor(safe / 60).toString().padStart(2,"0");
+  const sec = (safe % 60).toString().padStart(2,"0");
+  timerEl.textContent = `${m}:${sec}`;
+}
+
+function savePomo(){
+  localStorage.setItem(POMO_KEY, JSON.stringify({
+    seconds:pomoSeconds, running:pomoRunning, endAt:pomoEndAt, minutes:pomoModeMinutes
+  }));
+}
+
+function loadPomo(){
+  try{
+    const data=JSON.parse(localStorage.getItem(POMO_KEY)||"null");
+    if(!data) return;
+    pomoModeMinutes=Number(data.minutes)||25;
+    pomoSeconds=Math.max(0,Number(data.seconds)||pomoModeMinutes*60);
+    pomoEndAt=data.endAt?Number(data.endAt):null;
+    modeButtons.forEach(b=>b.classList.toggle("active",Number(b.dataset.minutes)===pomoModeMinutes));
+    if(data.running && pomoEndAt){
+      pomoRunning=true;
+      syncTimer(true);
+      startTicker();
+    }
+  }catch(e){ localStorage.removeItem(POMO_KEY); }
+  updateTimer();
+}
+
+function startTicker(){
+  clearInterval(pomoInterval);
+  pomoInterval=setInterval(()=>syncTimer(false),250);
+}
+
+function syncTimer(silent){
+  if(!pomoRunning || !pomoEndAt) return;
+  pomoSeconds=Math.max(0,Math.ceil((pomoEndAt-Date.now())/1000));
+  updateTimer();
+  if(pomoSeconds<=0) finishPomodoro(silent);
+}
+
+function setPomodoro(minutes){
+  clearInterval(pomoInterval);
+  pomoRunning=false;
+  pomoEndAt=null;
+  pomoModeMinutes=Number(minutes)||25;
+  pomoSeconds=pomoModeMinutes*60;
+  startBtn.textContent="ابدأ";
+  timerCircle.classList.remove("finished");
+  updateTimer();
+  savePomo();
+}
+
+function ensureAudio(){
+  if(!audioContext) audioContext=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioContext.state==="suspended") audioContext.resume();
+}
+
+function playAlarm(){
+  try{
+    ensureAudio();
+    const now=audioContext.currentTime;
+    [0,0.35,0.7,1.05].forEach((offset,i)=>{
+      const osc=audioContext.createOscillator();
+      const gain=audioContext.createGain();
+      osc.type="sine"; osc.frequency.value=i%2?880:660;
+      gain.gain.setValueAtTime(0.0001,now+offset);
+      gain.gain.exponentialRampToValueAtTime(0.22,now+offset+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,now+offset+0.28);
+      osc.connect(gain).connect(audioContext.destination);
+      osc.start(now+offset); osc.stop(now+offset+0.3);
+    });
+  }catch(e){ /* Browser may block audio until a user gesture. */ }
+}
+
+function showStatus(message){
+  alarmStatus.textContent=message;
+  alarmStatus.classList.add("show");
+  setTimeout(()=>alarmStatus.classList.remove("show"),3500);
+}
+
+function notifyFinish(){
+  if("Notification" in window && Notification.permission==="granted"){
+    new Notification("Taskly 🍅",{body:"انتهى وقت التركيز! خُد استراحة قصيرة.",tag:"taskly-pomodoro"});
+  }
+}
+
+function finishPomodoro(){
+  clearInterval(pomoInterval);
+  pomoRunning=false;
+  pomoEndAt=null;
+  pomoSeconds=0;
+  startBtn.textContent="ابدأ";
+  updateTimer();
+  timerCircle.classList.add("finished");
+  playAlarm();
+  notifyFinish();
+  showStatus("⏰ انتهى الوقت — خُد استراحة صغيرة!");
+  setTimeout(()=>timerCircle.classList.remove("finished"),3000);
+  savePomo();
+}
+
+startBtn.addEventListener("click",()=>{
+  ensureAudio();
+  if(pomoRunning){
+    syncTimer(false);
+    if(!pomoRunning) return;
+    pomoSeconds=Math.max(0,Math.ceil((pomoEndAt-Date.now())/1000));
+    pomoRunning=false;
+    pomoEndAt=null;
+    clearInterval(pomoInterval);
+    startBtn.textContent="استمرار";
+    savePomo();
+    return;
+  }
+  if(pomoSeconds<=0) pomoSeconds=pomoModeMinutes*60;
+  pomoEndAt=Date.now()+pomoSeconds*1000;
+  pomoRunning=true;
+  startBtn.textContent="إيقاف مؤقت";
+  startTicker();
+  savePomo();
+});
+
+resetBtn.addEventListener("click",()=>setPomodoro(pomoModeMinutes));
+modeButtons.forEach(btn=>btn.addEventListener("click",()=>{
+  modeButtons.forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  setPomodoro(Number(btn.dataset.minutes));
+}));
+
+// Ask once for notifications after the user has interacted with the timer.
+if("Notification" in window && Notification.permission==="default"){
+  // Permission is intentionally requested only after clicking Start.
+  const oldStart=startBtn.onclick;
+  startBtn.addEventListener("click",()=>{
+    if(Notification.permission==="default") Notification.requestPermission().catch(()=>{});
+  },{once:true});
+}
+
+// If the tab was hidden, sync from Date.now() when the user returns.
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden && pomoRunning) syncTimer(false);
+});
+window.addEventListener("pageshow",()=>{ if(pomoRunning) syncTimer(false); });
+
+// Celebration when a task is completed.
+function celebrate(){
+  const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduced) return;
+  const pieces=Array.from({length:55},()=>{
+    const el=document.createElement("i");
+    el.className="confetti-piece";
+    el.style.left=(Math.random()*100)+"%";
+    el.style.setProperty("--drift",((Math.random()-.5)*220)+"px");
+    el.style.background=["#6c5ce7","#20b486","#f3a847","#e15d6b","#4aa3df"][Math.floor(Math.random()*5)];
+    el.style.animationDelay=(Math.random()*.35)+"s";
+    el.style.transform=`rotate(${Math.random()*180}deg)`;
+    celebration.appendChild(el);
+    setTimeout(()=>el.remove(),2300);
+    return el;
+  });
+}
+
+// Extend the existing task click behavior with celebration without changing the task logic.
+const originalTaskClick = tasksEl.onclick;
+// Capture completion at the event level before the existing delegated handler changes it.
+tasksEl.addEventListener("click",(e)=>{
+  if(!e.target.closest(".check")) return;
+  const item=e.target.closest(".task");
+  if(!item) return;
+  const id=item.dataset.id;
+  const task=tasks.find(t=>t.id===id);
+  if(task && !task.completed) setTimeout(celebrate,40);
+});
+
+loadPomo();
